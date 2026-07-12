@@ -1,0 +1,413 @@
+<Application x:Class="SentryNet.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:SentryNet"
+             StartupUri="MainWindow.xaml">
+  <Application.Resources>
+
+    <!-- ===== Palette (derived from the SentryNet logo: deep navy, radar blue, violet) ===== -->
+    <Color x:Key="Bg0Color">#070B18</Color>
+    <SolidColorBrush x:Key="Bg0" Color="#070B18"/>
+    <SolidColorBrush x:Key="Bg1" Color="#0E1428"/>
+    <SolidColorBrush x:Key="Bg2" Color="#161E38"/>
+    <SolidColorBrush x:Key="BgHover" Color="#1C2749"/>
+    <SolidColorBrush x:Key="Border" Color="#28345C"/>
+    <SolidColorBrush x:Key="Text" Color="#EAEEFB"/>
+    <SolidColorBrush x:Key="TextDim" Color="#94A2CC"/>
+    <SolidColorBrush x:Key="Accent" Color="#3B9EFF"/>
+    <SolidColorBrush x:Key="AccentDim" Color="#2A5896"/>
+    <SolidColorBrush x:Key="Down" Color="#3FB950"/>
+    <!-- Amber rather than pure orange: keeps green/amber apart under protan/deutan CVD. -->
+    <SolidColorBrush x:Key="Up" Color="#F5A623"/>
+    <SolidColorBrush x:Key="Selection" Color="#23477F"/>
+    <SolidColorBrush x:Key="Alert" Color="#F85149"/>
+    <!-- Row-action icons: a touch brighter than TextDim so clickable ones read clearly. -->
+    <SolidColorBrush x:Key="IconBright" Color="#C6CFEA"/>
+    <SolidColorBrush x:Key="MapLand" Color="#111B38"/>
+    <SolidColorBrush x:Key="MapStroke" Color="#33477C"/>
+    <!-- Neon country-border glow (outer halo → inner glow → crisp core). -->
+    <SolidColorBrush x:Key="MapGlowOuter" Color="#FF7A00"/>
+    <SolidColorBrush x:Key="MapGlowInner" Color="#FF9526"/>
+    <SolidColorBrush x:Key="MapBorderCore" Color="#FFBE5C"/>
+
+    <!-- Accent spots so the UI isn't wall-to-wall grey/blue. -->
+    <SolidColorBrush x:Key="Cyan" Color="#38D4E6"/>
+    <SolidColorBrush x:Key="Violet" Color="#A874FF"/>
+    <LinearGradientBrush x:Key="BrandGradient" StartPoint="0,0" EndPoint="1,0">
+      <GradientStop Color="#3B9EFF" Offset="0"/>
+      <GradientStop Color="#A855F7" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Header / bar backdrop with a faint blue lift. -->
+    <LinearGradientBrush x:Key="HeaderBg" StartPoint="0,0" EndPoint="0,1">
+      <GradientStop Color="#131C38" Offset="0"/>
+      <GradientStop Color="#0C1226" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Radar-style backdrop for the map viewport. -->
+    <RadialGradientBrush x:Key="MapBackdrop" GradientOrigin="0.5,0.42" Center="0.5,0.42"
+                         RadiusX="0.75" RadiusY="0.9">
+      <GradientStop Color="#0E1730" Offset="0"/>
+      <GradientStop Color="#0A1024" Offset="0.55"/>
+      <GradientStop Color="#05070F" Offset="1"/>
+    </RadialGradientBrush>
+
+    <local:HumanBytesConverter x:Key="Bytes"/>
+    <BooleanToVisibilityConverter x:Key="BoolVis"/>
+
+    <!-- ===== ScrollBar (slim, dark) ===== -->
+    <Style x:Key="ScrollThumb" TargetType="Thumb">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Border Background="#3C4A72" CornerRadius="4"/>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="ScrollBar">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Width" Value="10"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Grid Background="Transparent">
+              <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track.Thumb>
+                  <Thumb Style="{StaticResource ScrollThumb}" Margin="2,0"/>
+                </Track.Thumb>
+              </Track>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="Orientation" Value="Horizontal">
+                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto"/>
+          <Setter Property="Height" Value="10"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <!-- ===== ToolTip ===== -->
+    <Style TargetType="ToolTip">
+      <Setter Property="Background" Value="{StaticResource Bg2}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="10,6"/>
+    </Style>
+
+    <!-- ===== TabControl ===== -->
+    <Style TargetType="TabControl">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabItem">
+            <Border x:Name="bd" Background="Transparent" Padding="18,9" Margin="0,0,4,0"
+                    BorderThickness="0,0,0,2" BorderBrush="Transparent">
+              <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource BrandGradient}"/>
+                <Setter TargetName="bd" Property="Background" Value="#141C36"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Bg1}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== Chevron expander toggle ===== -->
+    <Style x:Key="Chevron" TargetType="ToggleButton">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border Background="Transparent" Width="24" Height="24">
+              <Path x:Name="arrow" Data="M 3,1 L 9,7 L 3,13" Stroke="{StaticResource TextDim}"
+                    StrokeThickness="1.8" HorizontalAlignment="Center" VerticalAlignment="Center"
+                    RenderTransformOrigin="0.5,0.5"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="arrow" Property="RenderTransform">
+                  <Setter.Value>
+                    <RotateTransform Angle="90"/>
+                  </Setter.Value>
+                </Setter>
+                <Setter TargetName="arrow" Property="Stroke" Value="{StaticResource Accent}"/>
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="arrow" Property="Stroke" Value="{StaticResource Text}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== DataGrid ===== -->
+    <!-- Column header with a visible resize gripper on its right edge. -->
+    <Style TargetType="DataGridColumnHeader">
+      <Setter Property="Background" Value="{StaticResource HeaderBg}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+      <Setter Property="Padding" Value="9,8"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="DataGridColumnHeader">
+            <Grid>
+              <Border x:Name="bd" Background="{TemplateBinding Background}"
+                      BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                      Padding="{TemplateBinding Padding}">
+                <ContentPresenter VerticalAlignment="Center"
+                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+              </Border>
+              <!-- Drag-to-resize handles (WPF looks for these PART names). The left one is
+                   invisible — without a template it renders the default white button chrome. -->
+              <Thumb x:Name="PART_LeftHeaderGripper" HorizontalAlignment="Left"
+                     Width="8" Cursor="SizeWE">
+                <Thumb.Template>
+                  <ControlTemplate TargetType="Thumb">
+                    <Border Background="Transparent"/>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+              <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right"
+                     Width="8" Cursor="SizeWE">
+                <Thumb.Template>
+                  <ControlTemplate TargetType="Thumb">
+                    <Border Background="Transparent" Padding="3,0">
+                      <Rectangle x:Name="grip" Width="1" Fill="{StaticResource Border}"
+                                 Margin="0,6" RadiusX="0.5" RadiusY="0.5"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="grip" Property="Width" Value="2"/>
+                        <Setter TargetName="grip" Property="Fill" Value="{StaticResource Accent}"/>
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Bg2}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="DataGridCell">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="9,6"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="DataGridCell">
+            <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+              <ContentPresenter VerticalAlignment="Center"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="Transparent"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style TargetType="DataGridRow">
+      <Setter Property="Background" Value="Transparent"/>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{StaticResource BgHover}"/>
+        </Trigger>
+        <Trigger Property="IsSelected" Value="True">
+          <Setter Property="Background" Value="{StaticResource Selection}"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style TargetType="DataGrid">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="GridLinesVisibility" Value="None"/>
+      <Setter Property="HeadersVisibility" Value="Column"/>
+      <Setter Property="AutoGenerateColumns" Value="False"/>
+      <Setter Property="IsReadOnly" Value="True"/>
+      <Setter Property="CanUserAddRows" Value="False"/>
+      <Setter Property="CanUserResizeRows" Value="False"/>
+      <Setter Property="SelectionMode" Value="Single"/>
+      <Setter Property="RowDetailsVisibilityMode" Value="Collapsed"/>
+      <Setter Property="EnableRowVirtualization" Value="True"/>
+      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling"/>
+    </Style>
+
+    <!-- ===== Map overlay buttons (+ / − / fit / sidebar toggle) ===== -->
+    <Style x:Key="MapBtn" TargetType="ButtonBase">
+      <Setter Property="Width" Value="36"/>
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="FontSize" Value="18"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ButtonBase">
+            <Border x:Name="bd" Background="#CC0E1428" CornerRadius="8"
+                    BorderBrush="{StaticResource Border}" BorderThickness="1">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Bg2}"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Selection}"/>
+              </Trigger>
+              <Trigger Property="ToggleButton.IsChecked" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== Small in-row icon button (process properties) ===== -->
+    <Style x:Key="RowIconBtn" TargetType="Button">
+      <Setter Property="Width" Value="26"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Foreground" Value="{StaticResource IconBright}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="5">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Bg2}"/>
+                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Selection}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.22"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== Pill toggle (header: hide-local) ===== -->
+    <Style x:Key="PillToggle" TargetType="ToggleButton">
+      <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="bd" Background="{StaticResource Bg0}" CornerRadius="13"
+                    BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="12,5">
+              <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#1E3A66"/>
+                <Setter TargetName="bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                <Setter Property="Foreground" Value="{StaticResource Text}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== Country sidebar row header ===== -->
+    <Style x:Key="CountryHeader" TargetType="ToggleButton">
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="bd" Background="Transparent" Padding="12,8"
+                    BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+              <ContentPresenter HorizontalAlignment="Stretch"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource BgHover}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="{StaticResource Bg2}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- ===== GridSplitter (sidebar resize) ===== -->
+    <Style x:Key="SidebarSplitter" TargetType="GridSplitter">
+      <Setter Property="Width" Value="6"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="SizeWE"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="GridSplitter">
+            <Border Background="Transparent">
+              <Rectangle Width="2" Fill="{StaticResource Border}" HorizontalAlignment="Center"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="#1E3A66"/>
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+  </Application.Resources>
+</Application>

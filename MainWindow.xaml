@@ -1,0 +1,490 @@
+<Window x:Class="SentryNet.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:SentryNet.Controls"
+        xmlns:app="clr-namespace:SentryNet"
+        Title="SentryNet" Width="1420" Height="800"
+        Icon="Assets/sentrynet_logo_icon.png"
+        Background="{StaticResource Bg0}"
+        Foreground="{StaticResource Text}"
+        FontFamily="Segoe UI Variable, Segoe UI"
+        FontSize="14"
+        WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <!-- ===== Header ===== -->
+    <Border Grid.Row="0" Background="#020115" Padding="16,8"
+            BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <!-- brand banner (lighthouse + wordmark); dark bg matches the header so it blends in -->
+        <Image DockPanel.Dock="Left" Source="Assets/sentrynet_logo_banner.png" Height="76"
+               VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"
+               ToolTip="SentryNet — by MatthySoft"/>
+
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+          <!-- filter -->
+          <Border Background="{StaticResource Bg0}" CornerRadius="6"
+                  BorderBrush="{StaticResource Border}" BorderThickness="1"
+                  Width="230" VerticalAlignment="Center" Margin="0,0,14,0">
+            <Grid>
+              <TextBox x:Name="FilterBox" Background="Transparent" BorderThickness="0"
+                       Foreground="{StaticResource Text}" CaretBrush="{StaticResource Text}"
+                       Padding="9,5" TextChanged="FilterBox_TextChanged"/>
+              <TextBlock x:Name="FilterHint" Text="Filter processes…" Margin="11,5,0,0"
+                         Foreground="{StaticResource TextDim}" IsHitTestVisible="False"/>
+            </Grid>
+          </Border>
+
+          <!-- hide local-address toggle -->
+          <ToggleButton x:Name="HideLocalToggle" Style="{StaticResource PillToggle}"
+                        Content="Hide local" Margin="0,0,16,0"
+                        ToolTip="Hide endpoints local to this machine (127.0.0.1, LAN, etc.)"
+                        IsChecked="{Binding HideLocal, Source={x:Static app:AppState.Instance}, Mode=TwoWay}"
+                        Checked="HideLocal_Changed" Unchecked="HideLocal_Changed"/>
+
+          <!-- Live rates, then cumulative totals. Cell widths mirror the ↓/↑ Rate and
+               ↓/↑ Total grid columns; the right margin equals everything right of them
+               (8 tab margin + 2 tab padding + 10 scrollbar + 76 actions column
+               − 16 header padding) so each figure sits over its column. -->
+          <Grid VerticalAlignment="Center" Margin="0,0,80,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="100"/>
+              <ColumnDefinition Width="100"/>
+              <ColumnDefinition Width="95"/>
+              <ColumnDefinition Width="95"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="9,0,0,0">
+              <TextBlock Text="↓" Foreground="{StaticResource Down}" FontWeight="Bold"
+                         FontSize="19" VerticalAlignment="Center"/>
+              <TextBlock x:Name="TotalDownText" Text="—" Margin="6,0,0,0"
+                         Foreground="{StaticResource Down}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="9,0,0,0">
+              <TextBlock Text="↑" Foreground="{StaticResource Up}" FontWeight="Bold"
+                         FontSize="19" VerticalAlignment="Center"/>
+              <TextBlock x:Name="TotalUpText" Text="—" Margin="6,0,0,0"
+                         Foreground="{StaticResource Up}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="9,0,0,0">
+              <TextBlock x:Name="DownBytesArrow" Text="↓" Foreground="{StaticResource TextDim}"
+                         FontWeight="Bold" FontSize="19" VerticalAlignment="Center"
+                         Visibility="Collapsed"/>
+              <TextBlock x:Name="TotalDownBytesText" Text="" Margin="6,0,0,0"
+                         Foreground="{StaticResource TextDim}" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="9,0,0,0">
+              <TextBlock x:Name="UpBytesArrow" Text="↑" Foreground="{StaticResource TextDim}"
+                         FontWeight="Bold" FontSize="19" VerticalAlignment="Center"
+                         Visibility="Collapsed"/>
+              <TextBlock x:Name="TotalUpBytesText" Text="" Margin="6,0,0,0"
+                         Foreground="{StaticResource TextDim}" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+
+        <!-- spacer -->
+        <Grid/>
+      </DockPanel>
+    </Border>
+
+    <!-- ===== Tabs ===== -->
+    <TabControl Grid.Row="1" x:Name="Tabs" Margin="8,6,8,0"
+                SelectionChanged="Tabs_SelectionChanged">
+
+      <TabItem Header="Connections">
+        <!-- CanContentScroll=False scrolls by pixels instead of snapping to whole rows,
+             which with a tall drilldown open would jump by its entire height. -->
+        <DataGrid x:Name="ProcGrid" Margin="0,6,0,0" Sorting="ProcGrid_Sorting"
+                  FrozenColumnCount="1" EnableRowVirtualization="False"
+                  ScrollViewer.CanContentScroll="False"
+                  PreviewMouseWheel="ProcGrid_PreviewMouseWheel">
+          <DataGrid.RowStyle>
+            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+              <Setter Property="DetailsVisibility" Value="Collapsed"/>
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                  <Setter Property="DetailsVisibility" Value="Visible"/>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </DataGrid.RowStyle>
+
+          <DataGrid.Columns>
+            <!-- drilldown chevron, anchored to the far left and frozen there -->
+            <DataGridTemplateColumn Width="36" CanUserResize="False">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ToggleButton Style="{StaticResource Chevron}"
+                                IsChecked="{Binding IsExpanded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+
+            <DataGridTextColumn Header="PID" Binding="{Binding Pid}" Width="76"/>
+
+            <DataGridTemplateColumn Header="Process" Width="*" SortMemberPath="Name">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                               ToolTip="{Binding ExePath}" VerticalAlignment="Center"/>
+                    <TextBlock Text="⚠" FontWeight="Bold" Margin="7,0,0,0"
+                               VerticalAlignment="Center" Foreground="{StaticResource Alert}"
+                               ToolTip="Unsigned executable — no valid digital signature (Authenticode or Windows catalog)"
+                               Visibility="{Binding IsUnsigned, Converter={StaticResource BoolVis}}"/>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+
+            <DataGridTextColumn Header="Path" Binding="{Binding ExePath}" Width="250">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock">
+                  <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                  <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                  <Setter Property="ToolTip" Value="{Binding ExePath}"/>
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+
+            <DataGridTextColumn Header="Connections" Binding="{Binding ConnCount}" Width="110"/>
+
+            <DataGridTemplateColumn Header="Activity (60 s)" Width="180" SortMemberPath="DownRate">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <ctrl:Sparkline Row="{Binding}" Version="{Binding HistoryVersion}"
+                                  Height="28" Margin="2,2"/>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+
+            <DataGridTextColumn Header="↓ Rate" Width="100" SortMemberPath="DownRate"
+                                Binding="{Binding DownRate, Converter={StaticResource Bytes}, ConverterParameter=rate}">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock">
+                  <Setter Property="Foreground" Value="{StaticResource Down}"/>
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+
+            <DataGridTextColumn Header="↑ Rate" Width="100" SortMemberPath="UpRate"
+                                Binding="{Binding UpRate, Converter={StaticResource Bytes}, ConverterParameter=rate}">
+              <DataGridTextColumn.ElementStyle>
+                <Style TargetType="TextBlock">
+                  <Setter Property="Foreground" Value="{StaticResource Up}"/>
+                </Style>
+              </DataGridTextColumn.ElementStyle>
+            </DataGridTextColumn>
+
+            <DataGridTextColumn Header="↓ Total" Width="95" SortMemberPath="TotalDown"
+                                Binding="{Binding TotalDown, Converter={StaticResource Bytes}}"/>
+            <DataGridTextColumn Header="↑ Total" Width="95" SortMemberPath="TotalUp"
+                                Binding="{Binding TotalUp, Converter={StaticResource Bytes}}"/>
+
+            <!-- row actions: firewall block toggle + Windows file-properties dialog -->
+            <DataGridTemplateColumn Width="76" CanUserResize="False">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal">
+                    <Button Content="🚫" Click="Block_Click">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource RowIconBtn}">
+                          <Setter Property="ToolTip"
+                                  Value="Block outbound traffic (adds a Windows Firewall rule)"/>
+                          <Style.Triggers>
+                            <!-- no path for protected/system processes -->
+                            <DataTrigger Binding="{Binding ExePath}" Value="{x:Null}">
+                              <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                            <!-- active rule shown by the red tint, not by brightness -->
+                            <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                              <Setter Property="Background" Value="#59F85149"/>
+                              <Setter Property="ToolTip"
+                                      Value="Outbound traffic blocked — click to remove the firewall rule"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button Content="⚙" ToolTip="Properties" Click="Properties_Click"
+                            Margin="4,0,0,0">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource RowIconBtn}">
+                          <Style.Triggers>
+                            <!-- no path for protected/system processes -->
+                            <DataTrigger Binding="{Binding ExePath}" Value="{x:Null}">
+                              <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+          </DataGrid.Columns>
+
+          <DataGrid.RowDetailsTemplate>
+            <DataTemplate>
+              <!-- MaxWidth pinned to the outer grid's viewport so the star column can't
+                   blow out to infinity when a drilldown column is resized. -->
+              <Border Background="{StaticResource Bg1}" BorderBrush="{StaticResource Border}"
+                      BorderThickness="0,1" Padding="36,4,8,8" HorizontalAlignment="Left"
+                      MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type ScrollContentPresenter}}}">
+                <!-- Shows every connection at full height — vertical scrolling is disabled;
+                     wheel events are intercepted by ProcGrid_PreviewMouseWheel before this
+                     grid's ScrollViewer can swallow them. -->
+                <DataGrid ItemsSource="{Binding Connections}" EnableRowVirtualization="False"
+                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto" FontSize="13">
+                  <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                      <Style.Triggers>
+                        <MultiDataTrigger>
+                          <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding IsLocal}" Value="True"/>
+                            <Condition Binding="{Binding HideLocal, Source={x:Static app:AppState.Instance}}" Value="True"/>
+                          </MultiDataTrigger.Conditions>
+                          <Setter Property="Visibility" Value="Collapsed"/>
+                        </MultiDataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </DataGrid.RowStyle>
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Proto" Binding="{Binding Proto}" Width="62">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource Cyan}"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding Proto}" Value="UDP">
+                              <Setter Property="Foreground" Value="{StaticResource Violet}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Proto}" Value="UDPv6">
+                              <Setter Property="Foreground" Value="{StaticResource Violet}"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="State" Binding="{Binding State}" Width="120">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Remote host" Binding="{Binding Hostname}" Width="220" MinWidth="140">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                          <Setter Property="ToolTip" Value="{Binding Hostname}"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Remote IP" Binding="{Binding RemoteIp}" Width="135"/>
+                    <DataGridTextColumn Header="Port" Binding="{Binding RemotePort}" Width="54"/>
+                    <DataGridTextColumn Header="Location" Binding="{Binding Location}" Width="130"/>
+                    <DataGridTextColumn Header="Owner" Binding="{Binding Org}" Width="140">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                          <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="↓ Rate" Width="90" SortMemberPath="DownRate"
+                                        Binding="{Binding DownRate, Converter={StaticResource Bytes}, ConverterParameter=rate}">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource Down}"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="↑ Rate" Width="90" SortMemberPath="UpRate"
+                                        Binding="{Binding UpRate, Converter={StaticResource Bytes}, ConverterParameter=rate}">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource Up}"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="↓ Total" Width="80" SortMemberPath="TotalDown"
+                                        Binding="{Binding TotalDown, Converter={StaticResource Bytes}}"/>
+                    <DataGridTextColumn Header="↑ Total" Width="80" SortMemberPath="TotalUp"
+                                        Binding="{Binding TotalUp, Converter={StaticResource Bytes}}"/>
+                    <DataGridTextColumn Header="↓ Pkts 60s" Binding="{Binding Pkts60}" Width="86"/>
+                    <DataGridTextColumn Header="Local" Binding="{Binding LocalEndpoint}" Width="170">
+                      <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+                        </Style>
+                      </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Border>
+            </DataTemplate>
+          </DataGrid.RowDetailsTemplate>
+        </DataGrid>
+      </TabItem>
+
+      <TabItem Header="World Map">
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition x:Name="SidebarCol" Width="320" MinWidth="0"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- map viewport: wheel zoom, drag pan -->
+          <Border x:Name="MapViewport" Grid.Column="0" ClipToBounds="True"
+                  Background="{StaticResource MapBackdrop}" Cursor="Hand"
+                  SizeChanged="MapViewport_SizeChanged"
+                  MouseWheel="Map_MouseWheel"
+                  MouseLeftButtonDown="Map_MouseLeftButtonDown"
+                  MouseLeftButtonUp="Map_MouseLeftButtonUp"
+                  MouseMove="Map_MouseMove">
+            <Grid x:Name="MapRoot" Width="1000" Height="500"
+                  HorizontalAlignment="Left" VerticalAlignment="Top">
+              <Grid.RenderTransform>
+                <TransformGroup>
+                  <ScaleTransform x:Name="MapScale"/>
+                  <TranslateTransform x:Name="MapPan"/>
+                </TransformGroup>
+              </Grid.RenderTransform>
+              <!-- ocean -->
+              <Rectangle>
+                <Rectangle.Fill>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#0C1630" Offset="0"/>
+                    <GradientStop Color="#080E1F" Offset="1"/>
+                  </LinearGradientBrush>
+                </Rectangle.Fill>
+              </Rectangle>
+              <Path x:Name="WorldPath">
+                <Path.Fill>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#141F40" Offset="0"/>
+                    <GradientStop Color="#0D1530" Offset="1"/>
+                  </LinearGradientBrush>
+                </Path.Fill>
+              </Path>
+              <!-- Glowing country borders: wide soft halo → tighter glow → crisp core.
+                   Thicknesses are counter-scaled on zoom (UpdateBorderScale). -->
+              <Path x:Name="BorderGlowOuter" Stroke="{StaticResource MapGlowOuter}"
+                    StrokeThickness="3.2" Opacity="0.16" IsHitTestVisible="False"
+                    StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+              <Path x:Name="BorderGlowInner" Stroke="{StaticResource MapGlowInner}"
+                    StrokeThickness="1.4" Opacity="0.38" IsHitTestVisible="False"
+                    StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+              <Path x:Name="BorderCore" Stroke="{StaticResource MapBorderCore}"
+                    StrokeThickness="0.55" Opacity="0.95" IsHitTestVisible="False"
+                    StrokeLineJoin="Round"/>
+              <Canvas x:Name="MapOverlay" Width="1000" Height="500"/>
+            </Grid>
+          </Border>
+
+          <!-- zoom / sidebar controls -->
+          <StackPanel Grid.Column="0" HorizontalAlignment="Right" VerticalAlignment="Top"
+                      Margin="0,10,10,0">
+            <Button Content="+" Style="{StaticResource MapBtn}" Click="ZoomIn_Click"
+                    ToolTip="Zoom in"/>
+            <Button Content="−" Style="{StaticResource MapBtn}" Click="ZoomOut_Click"
+                    Margin="0,6,0,0" ToolTip="Zoom out"/>
+            <Button Content="⤢" Style="{StaticResource MapBtn}" Click="ZoomFit_Click"
+                    Margin="0,6,0,0" FontSize="15" ToolTip="Reset view"/>
+            <ToggleButton x:Name="SidebarToggle" Content="☰" Style="{StaticResource MapBtn}"
+                          Margin="0,14,0,0" FontSize="15" IsChecked="True"
+                          Checked="SidebarToggle_Changed" Unchecked="SidebarToggle_Changed"
+                          ToolTip="Show / hide country list"/>
+          </StackPanel>
+
+          <!-- drag handle to resize the country sidebar -->
+          <GridSplitter x:Name="SidebarSplitter" Grid.Column="1"
+                        Style="{StaticResource SidebarSplitter}"
+                        Visibility="{Binding IsChecked, ElementName=SidebarToggle, Converter={StaticResource BoolVis}}"/>
+
+          <!-- country sidebar -->
+          <Border x:Name="Sidebar" Grid.Column="2" Background="{StaticResource Bg1}"
+                  BorderBrush="{StaticResource Border}" BorderThickness="1,0,0,0"
+                  Visibility="{Binding IsChecked, ElementName=SidebarToggle, Converter={StaticResource BoolVis}}">
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Text="CONNECTIONS BY COUNTRY"
+                         Foreground="{StaticResource Violet}" FontSize="12" FontWeight="SemiBold"
+                         Margin="12,10,12,8"/>
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="CountryList">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel>
+                        <ToggleButton Style="{StaticResource CountryHeader}"
+                                      IsChecked="{Binding IsExpanded, Mode=TwoWay}">
+                          <Grid>
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="36"/>
+                              <ColumnDefinition Width="*"/>
+                              <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Background="{StaticResource Bg2}" CornerRadius="4"
+                                    Padding="5,1" HorizontalAlignment="Left" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Code}" FontSize="11" FontWeight="SemiBold"
+                                         Foreground="{StaticResource Cyan}"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="8,0,0,0"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding ConnCount}" Foreground="{StaticResource TextDim}"/>
+                              <TextBlock Text="{Binding Rate, Converter={StaticResource Bytes}, ConverterParameter=rate}"
+                                         Foreground="{StaticResource Down}" Margin="10,0,0,0" MinWidth="62"
+                                         TextAlignment="Right"/>
+                            </StackPanel>
+                          </Grid>
+                        </ToggleButton>
+                        <ItemsControl ItemsSource="{Binding Items}"
+                                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolVis}}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Border Padding="16,5,12,5" Background="{StaticResource Bg0}"
+                                      BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1">
+                                <StackPanel>
+                                  <DockPanel>
+                                    <TextBlock Text="{Binding RateText}" DockPanel.Dock="Right"
+                                               Foreground="{StaticResource TextDim}" FontSize="12"/>
+                                    <TextBlock Text="{Binding Process}" FontWeight="SemiBold" FontSize="13"
+                                               TextTrimming="CharacterEllipsis"/>
+                                  </DockPanel>
+                                  <TextBlock Text="{Binding Endpoint}" FontSize="12"
+                                             Foreground="{StaticResource Accent}" TextTrimming="CharacterEllipsis"
+                                             ToolTip="{Binding Endpoint}"/>
+                                  <TextBlock Text="{Binding Detail}" FontSize="12"
+                                             Foreground="{StaticResource TextDim}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </Grid>
+      </TabItem>
+
+    </TabControl>
+
+    <!-- ===== Status bar ===== -->
+    <Border Grid.Row="2" Background="{StaticResource HeaderBg}" Padding="16,7"
+            BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,0">
+      <TextBlock x:Name="StatusText" Foreground="{StaticResource TextDim}" FontSize="13"/>
+    </Border>
+  </Grid>
+</Window>
