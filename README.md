@@ -2,10 +2,10 @@
 
 By **MatthySoft**.
 
-SentryNet is a real-time network monitor for Windows. It reveals every process
-making network connections — live down/up rates, resolved hostnames,
-geolocation, and ISP owner — and plots each remote endpoint on an interactive
-world map. A native WPF app with a dark UI, built on .NET 9.
+A real-time network monitor for Windows. Reveals every process 
+making network connections. Live down/up rates, resolved hostnames, 
+geolocation, and ISP owner. Plots each remote endpoint on an interactive
+world map. Native Windows firewall blocking functionality. Built on .NET 9. 
 
 ## Features
 
